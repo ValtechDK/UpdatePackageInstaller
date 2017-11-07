@@ -17,6 +17,9 @@ namespace HedgehogDevelopment.PackageInstaller
     class Program
     {
         static int verbosity;
+
+        static bool keepConnector;
+        static bool deleteConnector;
         static string SitecoreConnectorDLL { get; set; }
         static string SitecoreConnectorASMX { get; set; }
 
@@ -39,7 +42,16 @@ namespace HedgehogDevelopment.PackageInstaller
                     v => sitecoreDeployFolder = v },
    	            { "v", "Increase debug message verbosity.\n",
                     v => { if (v != null) ++verbosity; } },
-   	            { "h|help",  "Show this message and exit.", 
+                {
+                    "k", "Keep Sitecore connector for next deployments.\n",
+                    v=> keepConnector = true
+                },
+                {
+                    "d", "Delete Sitecore connector only, DON'T install any update.\n",
+                    v=> deleteConnector = true
+                },
+
+                   { "h|help",  "Show this message and exit.", 
                     v => show_help = v != null },
              };
             #endregion
@@ -66,7 +78,7 @@ namespace HedgehogDevelopment.PackageInstaller
             #region Validate and process parameters
             bool parameterMissing = false;
 
-            if (string.IsNullOrEmpty(packagePath))
+            if (string.IsNullOrEmpty(packagePath) && !deleteConnector)
             {
                 ShowError("Package Path is required.");
 
@@ -107,16 +119,26 @@ namespace HedgehogDevelopment.PackageInstaller
                         // Install Sitecore connector
                         if (DeploySitecoreConnector(sitecoreDeployFolder))
                         {
-                            using (TdsPackageInstaller.TdsPackageInstaller service = new TdsPackageInstaller.TdsPackageInstaller())
+                            if (!deleteConnector)
                             {
-                                service.Url = string.Concat(sitecoreWebURL, Properties.Settings.Default.SitecoreConnectorFolder, "/TdsPackageInstaller.asmx");
-                                service.Timeout = 600000;
- 
-                                Debug("Initializing package installation ..");
+                                using (
+                                    TdsPackageInstaller.TdsPackageInstaller service =
+                                        new TdsPackageInstaller.TdsPackageInstaller())
+                                {
+                                    service.Url = string.Concat(sitecoreWebURL,
+                                        Properties.Settings.Default.SitecoreConnectorFolder, "/TdsPackageInstaller.asmx");
+                                    service.Timeout = -1;
 
-                                service.InstallPackage(packagePath);
+                                    Debug("Initializing package installation ..");
 
-                                Debug("Update package installed successfully.");
+                                    service.InstallPackage(packagePath);
+
+                                    Debug("Update package installed successfully.");
+                                }
+                            }
+                            else
+                            {
+                                Debug("Skip installing package. Only prepare for deleting connector.");
                             }
                         }
                         else
@@ -188,6 +210,7 @@ namespace HedgehogDevelopment.PackageInstaller
         static bool DeploySitecoreConnector(string sitecoreDeployFolder)
         {
             Debug("Initializing Sitecore connector ...");
+            var skipped = false;
 
             string sourceFolder = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             FileInfo serviceLibrary = new FileInfo(sourceFolder + @"\HedgehogDevelopment.TDS.PackageInstallerService.dll");
@@ -219,17 +242,27 @@ namespace HedgehogDevelopment.PackageInstaller
             {
                 File.SetAttributes(SitecoreConnectorDLL, FileAttributes.Normal);
                 File.SetAttributes(SitecoreConnectorASMX, FileAttributes.Normal);
+                Debug("Sitecore connector already deployed. New deployment skipped.");
+                skipped = true;
+            }
+            else
+            {
+                File.Copy(serviceLibrary.FullName, SitecoreConnectorDLL, true);
             }
 
             if (File.Exists(SitecoreConnectorASMX))
             {
                 File.SetAttributes(SitecoreConnectorASMX, FileAttributes.Normal);
             }
+            else
+            {
+                File.Copy(serviceFile.FullName, SitecoreConnectorASMX, true);
+            }
 
-            File.Copy(serviceLibrary.FullName, SitecoreConnectorDLL, true);
-            File.Copy(serviceFile.FullName, SitecoreConnectorASMX, true);
-
-            Debug("Sitecore connector deployed successfully.");
+            if (!skipped)
+            {
+                Debug("Sitecore connector deployed successfully.");
+            }
 
             return true;
         }
@@ -239,7 +272,7 @@ namespace HedgehogDevelopment.PackageInstaller
         /// </summary>
         static void RemoveSitecoreConnector()
         {
-            if (!string.IsNullOrEmpty(SitecoreConnectorDLL) && !string.IsNullOrEmpty(SitecoreConnectorASMX))
+            if (!string.IsNullOrEmpty(SitecoreConnectorDLL) && !string.IsNullOrEmpty(SitecoreConnectorASMX) && !keepConnector)
             {
                 File.SetAttributes(SitecoreConnectorDLL, FileAttributes.Normal);
                 File.SetAttributes(SitecoreConnectorASMX, FileAttributes.Normal);
@@ -248,6 +281,10 @@ namespace HedgehogDevelopment.PackageInstaller
                 File.Delete(SitecoreConnectorASMX);
 
                 Debug("Sitecore connector removed successfully.");
+            }
+            if (keepConnector)
+            {
+                Debug("Sitecore connector remains for next deployments.");
             }
         }
 
