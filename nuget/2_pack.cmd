@@ -1,0 +1,1 @@
+nuget pack Hedgehog_UpdatePackageInstaller.nuspec 

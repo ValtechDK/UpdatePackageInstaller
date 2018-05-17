@@ -1,0 +1,44 @@
+Write-Host 'Preparing to update Sitecore with update packages'
+
+Write-Host "installDir = " $installDir
+Write-Host "updatePackageDir = " $updatePackageDir
+Write-Host "SslBindingEnabled = " $SslBindingEnabled
+Write-Host "Hostname = " $Hostname
+
+
+$sitecoreProtocol = if (([System.Convert]::ToBoolean($SslBindingEnabled))) { "https://" } else { "http://" }
+$sitecoreUrl = $sitecoreProtocol + $Hostname
+# Timeout is set to 2 hours because TDS deploy is extremely slow on some servers
+$timeout = 7200000
+
+$tdsPath = $installDir + "\_DEV\Deployment\TDS.PackageInstaller\PackageInstaller.exe"
+$invokeExpression = $tdsPath + " -k -v -sitecoreUrl " + $sitecoreUrl + " -sitecoreDeployFolder " + $installDir + " -packagePath "
+$timeoutParameter = " --timeout " + $timeout
+
+Write-Host "sitecoreUrl = " $sitecoreUrl
+Write-Host "tdsPath = " $tdsPath
+Write-Host "timeout = " $timeout
+
+function InstallPackage($packagePath)
+{
+    try
+    {
+        $currentExpression =  $invokeExpression + $packagePath + $timeoutParameter
+        Write-Host "Installing package" $packagePath
+        Write-Host "Invoking = " $currentExpression
+        Invoke-Expression $currentExpression
+        Write-Host "Done installing package" $packagePath
+    }
+    catch
+    {
+        Write-Host "Could not install package:" $packagePath
+    }
+
+}
+
+Get-ChildItem $updatePackageDir -Recurse | Where-Object { $_.Name -like "*.update" } | ForEach-Object { InstallPackage ($_.FullName) }
+
+Write-Host "Removing Sitecore connector"
+$invokeExpression = $tdsPath + " -d -v -sitecoreUrl " + $sitecoreUrl + " -sitecoreDeployFolder " + $installDir
+Invoke-Expression $invokeExpression
+Write-Host "Done removing Sitecore connector"

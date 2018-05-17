@@ -1,0 +1,1 @@
+nuget push Hedgehog_UpdatePackageInstaller.1.0.4.nupkg -source "http://nuget.valtech.dk/" dmFsdGVjaG51Z2V0ZmVlZHYz

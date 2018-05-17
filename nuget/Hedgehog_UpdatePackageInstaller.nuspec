@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+    <metadata>
+        <id>Hedgehog_UpdatePackageInstaller</id>
+        <version>1.0.4</version>
+        <authors>alexander.serduk</authors>
+        <owners>Valtech A/S</owners>
+        <requireLicenseAcceptance>false</requireLicenseAcceptance>
+        <description>The TDS package installer allows you to install packages through the command line.</description>
+    </metadata>
+</package>
